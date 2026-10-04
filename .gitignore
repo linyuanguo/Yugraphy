@@ -1,0 +1,18 @@
+.env
+certs/
+frontend/dist/
+frontend/node_modules/
+__pycache__/
+*.pyc
+.venv/
+uploads/
+.DS_Store
+*.log
+frontend/.build_version
+
+# 运行时数据与本地环境（含密钥/大数据，禁止上传）
+.env.bak*
+data/
+.codebuddy/
+ocr_ab_results/
+backend/app/ocr_ab/

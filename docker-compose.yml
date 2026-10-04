@@ -1,0 +1,90 @@
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: genealogy_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/genealogy.conf:/etc/nginx/conf.d/genealogy.conf:ro
+      # 覆盖官方镜像自带的 default.conf，避免 server_name 不匹配时 80 端口被它抢占（不跳转、API 404）
+      - ./nginx/empty.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx/cert:/usr/share/nginx/cert:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: genealogy_backend
+    # 生产模式：去掉热重载（避免改代码即触发任务重置）；代码经 ./backend 挂载，重启即生效
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    expose:
+      - "8000"
+    env_file: .env
+    # 等 PG/Neo4j 真正就绪（健康检查通过）后才启动，避免启动时序导致崩溃循环
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - ./backend:/app          # 源码挂载，便于部署（重启加载新代码）
+      - ./data/uploads:/app/uploads
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5.26
+    container_name: genealogy_neo4j
+    expose:
+      - "7687"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_server_memory_heap_max__size: 1G
+    volumes:
+      - ./data/neo4j_data:/data
+      - ./data/neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -a bolt://localhost:7687 -u neo4j -p $${NEO4J_AUTH#neo4j/} 'RETURN 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: genealogy_pg
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: genealogy
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - ./data/pg_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d genealogy"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 15s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2023-05-04T21-44-30Z
+    container_name: genealogy_minio
+    expose:
+      - "9000"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    volumes:
+      - ./data/minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped

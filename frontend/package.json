@@ -1,0 +1,28 @@
+{
+  "name": "genealogy-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@antv/g6": "^4.8.24",
+    "ant-design-vue": "^4.2.6",
+    "axios": "^1.7.7",
+    "dayjs": "^1.11.13",
+    "pinia": "^2.2.4",
+    "three": "^0.169.0",
+    "vue": "^3.4.38",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@types/three": "^0.169.0",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8",
+    "vue-tsc": "^2.1.6"
+  }
+}
